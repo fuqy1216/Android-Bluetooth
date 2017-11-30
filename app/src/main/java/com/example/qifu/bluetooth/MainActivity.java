@@ -7,6 +7,7 @@ package com.example.qifu.bluetooth;
         import android.os.Bundle;
         import android.os.Environment;
         import android.os.Handler;
+        import java.lang.reflect.Method;
         import android.util.Log;
         import android.view.View;
         import android.widget.TextView;
@@ -31,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
     TextView myLabel;
     EditText myTextbox;
     BluetoothAdapter mBluetoothAdapter;
+    private BluetoothSocketWrapper bluetoothSocket;
     BluetoothSocket mmSocket;
     BluetoothDevice mmDevice;
     OutputStream mmOutputStream;
@@ -40,96 +42,108 @@ public class MainActivity extends AppCompatActivity {
     int readBufferPosition;
     int counter;
     volatile boolean stopWorker;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Button openButton = (Button)findViewById(R.id.open);
-        Button sendButton = (Button)findViewById(R.id.send);
-        Button closeButton = (Button)findViewById(R.id.close);
-        myLabel = (TextView)findViewById(R.id.label);
-        myTextbox = (EditText)findViewById(R.id.entry);
+        Button openButton = (Button) findViewById(R.id.open);
+        Button sendButton = (Button) findViewById(R.id.send);
+        Button closeButton = (Button) findViewById(R.id.close);
+        myLabel = (TextView) findViewById(R.id.label);
+        myTextbox = (EditText) findViewById(R.id.entry);
 
         //Open Button
-        openButton.setOnClickListener(new View.OnClickListener()
-        {
-            public void onClick(View v)
-            {
-                try
-                {
+        openButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
                     findBT();
                     openBT();
+                } catch (IOException ex) {
                 }
-                catch (IOException ex) { }
             }
         });
 
         //Send Button
-        sendButton.setOnClickListener(new View.OnClickListener()
-        {
-            public void onClick(View v)
-            {
-                try
-                {
+        sendButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
                     sendData();
+                } catch (IOException ex) {
                 }
-                catch (IOException ex) { }
             }
         });
 
         //Close button
-        closeButton.setOnClickListener(new View.OnClickListener()
-        {
-            public void onClick(View v)
-            {
-                try
-                {
+        closeButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
                     closeBT();
+                } catch (IOException ex) {
                 }
-                catch (IOException ex) { }
             }
         });
     }
 
-    void findBT()
-    {
+    void findBT() {
         final BluetoothManager bluetoothManager =
                 (BluetoothManager) getSystemService(getApplicationContext().BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
         //mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if(mBluetoothAdapter == null)
-        {
+        if (mBluetoothAdapter == null) {
             myLabel.setText("No bluetooth adapter available");
         }
-        if(!mBluetoothAdapter.isEnabled()) {
+        if (!mBluetoothAdapter.isEnabled()) {
             Intent enableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBluetooth, 0);
         }
         Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
-        String devicename = new String();;
-        if(pairedDevices.size() > 0)
-        {
-            for(BluetoothDevice device : pairedDevices)
-            {
-               // myLabel.setText(device.getName());
-                if(true/*device.getName().equals("SmartWatch 3 731C")*/)
-                {
+        String devicename = new String();
+        ;
+        if (pairedDevices.size() > 0) {
+            for (BluetoothDevice device : pairedDevices) {
+                // myLabel.setText(device.getName());
+                if (true/*device.getName().equals("SmartWatch 3 731C")*/) {
                     mmDevice = device;
                     devicename = device.getName();
                     break;
                 }
             }
         }
-        String found= "Bluetooth Device Found: " + devicename;
+        String found = "Bluetooth Device Found: " + devicename;
         myLabel.setText(found);
     }
 
-    void openBT() throws IOException
-    {
+    void openBT() throws IOException {
         UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"); //Standard SerialPortService ID
-        mmSocket = mmDevice.createRfcommSocketToServiceRecord(uuid);
-        mmSocket.connect();
+        // ParcelUuid[] uuid1 = mmDevice.getUuids();
+        //UUID uuid1 = UUID.fromString(uuid);
+        try {
+            mmSocket = mmDevice.createRfcommSocketToServiceRecord(uuid);
+            mmSocket.connect();
+        } catch (IOException e) {
+            //try the fallback
+            try {
+                bluetoothSocket = new FallbackBluetoothSocket(bluetoothSocket.getUnderlyingSocket());
+                Thread.sleep(500);
+                bluetoothSocket.connect();
+                //success = true;
+                mmOutputStream = bluetoothSocket.getOutputStream();
+                mmInputStream = bluetoothSocket.getInputStream();
+
+                beginListenForData();
+
+                myLabel.setText("Bluetooth Opened");
+                return;
+            } catch (FallbackException e1) {
+                Log.w("BT", "Could not initialize FallbackBluetoothSocket classes.", e);
+            } catch (InterruptedException e1) {
+                Log.w("BT", e1.getMessage(), e1);
+            } catch (IOException e1) {
+                Log.w("BT", "Fallback failed. Cancelling.", e1);
+            }
+        }
         mmOutputStream = mmSocket.getOutputStream();
         mmInputStream = mmSocket.getInputStream();
 
@@ -138,41 +152,31 @@ public class MainActivity extends AppCompatActivity {
         myLabel.setText("Bluetooth Opened");
     }
 
-    void beginListenForData()
-    {
+    void beginListenForData() {
         final Handler handler = new Handler();
         final byte delimiter = 10; //This is the ASCII code for a newline character
 
         stopWorker = false;
         readBufferPosition = 0;
         readBuffer = new byte[1024];
-        workerThread = new Thread(new Runnable()
-        {
-            public void run()
-            {
-                while(!Thread.currentThread().isInterrupted() && !stopWorker)
-                {
-                    try
-                    {
+        workerThread = new Thread(new Runnable() {
+            public void run() {
+                while (!Thread.currentThread().isInterrupted() && !stopWorker) {
+                    try {
                         int bytesAvailable = mmInputStream.available();
-                        if(bytesAvailable > 0)
-                        {
+                        if (bytesAvailable > 0) {
                             byte[] packetBytes = new byte[bytesAvailable];
                             mmInputStream.read(packetBytes);
-                            for(int i=0;i<bytesAvailable;i++)
-                            {
+                            for (int i = 0; i < bytesAvailable; i++) {
                                 byte b = packetBytes[i];
-                                if(b == delimiter)
-                                {
+                                if (b == delimiter) {
                                     byte[] encodedBytes = new byte[readBufferPosition];
                                     System.arraycopy(readBuffer, 0, encodedBytes, 0, encodedBytes.length);
                                     final String data = new String(encodedBytes);
                                     readBufferPosition = 0;
-                                    handler.post(new Runnable()
-                                    {
-                                        public void run()
-                                        {
-                                           myLabel.setText(data);
+                                    handler.post(new Runnable() {
+                                        public void run() {
+                                            myLabel.setText(data);
 
                                             final int total_row = data.length();
                                             Log.i("BlueToothAlbert", "total_row = " + total_row);
@@ -217,19 +221,15 @@ public class MainActivity extends AppCompatActivity {
                                             } catch (IOException ioe) {
                                                 Log.e("BlueToothAlbert", "IOException while writing Logfile");
                                             }
-                                           // dataList.clear();
+                                            // dataList.clear();
                                         }
                                     });
-                                }
-                                else
-                                {
+                                } else {
                                     readBuffer[readBufferPosition++] = b;
                                 }
                             }
                         }
-                    }
-                    catch (IOException ex)
-                    {
+                    } catch (IOException ex) {
                         stopWorker = true;
                     }
                 }
@@ -239,20 +239,134 @@ public class MainActivity extends AppCompatActivity {
         workerThread.start();
     }
 
-    void sendData() throws IOException
-    {
+    void sendData() throws IOException {
         String msg = myTextbox.getText().toString();
         msg += "\n";
         mmOutputStream.write(msg.getBytes());
         myLabel.setText("Data Sent");
     }
 
-    void closeBT() throws IOException
-    {
+    void closeBT() throws IOException {
         stopWorker = true;
         mmOutputStream.close();
         mmInputStream.close();
         mmSocket.close();
         myLabel.setText("Bluetooth Closed");
     }
+
+    public static interface BluetoothSocketWrapper {
+
+        InputStream getInputStream() throws IOException;
+
+        OutputStream getOutputStream() throws IOException;
+
+        String getRemoteDeviceName();
+
+        void connect() throws IOException;
+
+        String getRemoteDeviceAddress();
+
+        void close() throws IOException;
+
+        BluetoothSocket getUnderlyingSocket();
+
     }
+
+    public static class NativeBluetoothSocket implements BluetoothSocketWrapper {
+
+        private BluetoothSocket socket;
+
+        public NativeBluetoothSocket(BluetoothSocket tmp) {
+            this.socket = tmp;
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            return socket.getInputStream();
+        }
+
+        @Override
+        public OutputStream getOutputStream() throws IOException {
+            return socket.getOutputStream();
+        }
+
+        @Override
+        public String getRemoteDeviceName() {
+            return socket.getRemoteDevice().getName();
+        }
+
+        @Override
+        public void connect() throws IOException {
+            socket.connect();
+        }
+
+        @Override
+        public String getRemoteDeviceAddress() {
+            return socket.getRemoteDevice().getAddress();
+        }
+
+        @Override
+        public void close() throws IOException {
+            socket.close();
+        }
+
+        @Override
+        public BluetoothSocket getUnderlyingSocket() {
+            return socket;
+        }
+
+    }
+
+    public class FallbackBluetoothSocket extends NativeBluetoothSocket {
+
+        private BluetoothSocket fallbackSocket;
+
+        public FallbackBluetoothSocket(BluetoothSocket tmp) throws FallbackException {
+            super(tmp);
+            try {
+                Class<?> clazz = tmp.getRemoteDevice().getClass();
+                Class<?>[] paramTypes = new Class<?>[]{Integer.TYPE};
+                Method m = clazz.getMethod("createRfcommSocket", paramTypes);
+                Object[] params = new Object[]{Integer.valueOf(1)};
+                fallbackSocket = (BluetoothSocket) m.invoke(tmp.getRemoteDevice(), params);
+            } catch (Exception e) {
+                throw new FallbackException(e);
+            }
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            return fallbackSocket.getInputStream();
+        }
+
+        @Override
+        public OutputStream getOutputStream() throws IOException {
+            return fallbackSocket.getOutputStream();
+        }
+
+
+        @Override
+        public void connect() throws IOException {
+            fallbackSocket.connect();
+        }
+
+
+        @Override
+        public void close() throws IOException {
+            fallbackSocket.close();
+        }
+
+    }
+    public static class FallbackException extends Exception {
+
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+
+        public FallbackException(Exception e) {
+            super(e);
+        }
+
+    }
+}
