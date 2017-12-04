@@ -13,6 +13,8 @@ package com.example.qifu.bluetooth;
         import android.widget.TextView;
         import android.widget.EditText;
         import android.widget.Button;
+        import android.widget.CompoundButton;
+        import android.widget.Switch;
 
         import java.io.BufferedWriter;
         import java.io.File;
@@ -40,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
     Thread workerThread;
     byte[] readBuffer;
     int readBufferPosition;
-    int counter;
+    boolean counter;
     volatile boolean stopWorker;
 
     @Override
@@ -51,9 +53,21 @@ public class MainActivity extends AppCompatActivity {
         Button openButton = (Button) findViewById(R.id.open);
         Button sendButton = (Button) findViewById(R.id.send);
         Button closeButton = (Button) findViewById(R.id.close);
+        Switch recordswitch = (Switch) findViewById(R.id.record);
         myLabel = (TextView) findViewById(R.id.label);
         myTextbox = (EditText) findViewById(R.id.entry);
 
+        recordswitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    // The toggle is enabled
+                    counter = true;
+                } else {
+                    counter = false;
+                    // The toggle is disabled
+                }
+            }
+        });
         //Open Button
         openButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -170,6 +184,7 @@ public class MainActivity extends AppCompatActivity {
                             for (int i = 0; i < bytesAvailable; i++) {
                                 byte b = packetBytes[i];
                                 if (b == delimiter) {
+
                                     byte[] encodedBytes = new byte[readBufferPosition];
                                     System.arraycopy(readBuffer, 0, encodedBytes, 0, encodedBytes.length);
                                     final String data = new String(encodedBytes);
@@ -177,38 +192,41 @@ public class MainActivity extends AppCompatActivity {
                                     handler.post(new Runnable() {
                                         public void run() {
                                             myLabel.setText(data);
+                                    if(counter) {
+                                        final int total_row = data.length();
+                                        Log.i("BlueToothAlbert", "total_row = " + total_row);
+                                        final String fileprefix = "export";
+                                        final String date = new SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(new Date());
+                                        final String exacttimer = new SimpleDateFormat("yyyyMMdd-HHmmssSSS", Locale.getDefault()).format(new Date());
+                                        final String filename = String.format("%s_%s.txt", fileprefix, date);
 
-                                            final int total_row = data.length();
-                                            Log.i("BlueToothAlbert", "total_row = " + total_row);
-                                            final String fileprefix = "export";
-                                            final String date = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(new Date());
-                                            final String filename = String.format("%s_%s.txt", fileprefix);
+                                        // final String directory = getContext().getApplicationContext().getFilesDir().getAbsolutePath();// + "/Albert";
+                                        final String directory = Environment.getExternalStorageDirectory().getAbsolutePath();// + "/sdcard";
+                                        final String direc = "/storage/emulated/0";
+                                        final File logfile = new File(directory, filename);
+                                        final File logPath = logfile.getParentFile();
 
-                                            // final String directory = getContext().getApplicationContext().getFilesDir().getAbsolutePath();// + "/Albert";
-                                            final String directory = Environment.getExternalStorageDirectory().getAbsolutePath();// + "/sdcard";
-                                            final String direc = "/storage/emulated/0";
-                                            final File logfile = new File(directory, filename);
-                                            final File logPath = logfile.getParentFile();
-
-                                            if (!logPath.isDirectory() && !logPath.mkdirs()) {
-                                                Log.e("BlueToothAlbert", "Could not create directory for log files");
-                                            }
+                                        if (!logPath.isDirectory() && !logPath.mkdirs()) {
+                                            Log.e("BlueToothAlbert", "Could not create directory for log files");
+                                        }
 /*
                 int permissionCheck = ContextCompat.checkSelfPermission(getContext().getApplicationContext().getCurrentActivity(),
                         android.Manifest.permission.WRITE_CALENDAR);*/
-                                            try {
-                                                FileWriter filewriter = new FileWriter(logfile, true);
-                                                BufferedWriter bw = new BufferedWriter(filewriter);
+                                        try {
+                                            FileWriter filewriter = new FileWriter(logfile, true);
+                                            BufferedWriter bw = new BufferedWriter(filewriter);
 
 
-                                                // Write the string to the file
-                                                for (int i = 1; i < total_row; i++) {
-                                                    StringBuffer sb = new StringBuffer(data);
-                                                    sb.append("\n");
-                                                    bw.append(sb.toString());
-                                                }
-                                                bw.flush();
-                                                bw.close();
+                                            // Write the string to the file
+                                            for (int i = 1; i < total_row; i++) {
+                                                StringBuffer sb = new StringBuffer(exacttimer);
+                                                sb.append("\t");
+                                                sb.append(String.valueOf(data));
+                                                sb.append("\n");
+                                                bw.append(sb.toString());
+                                            }
+                                            bw.flush();
+                                            bw.close();
                         /*Intent emailIntent = new Intent(android.content.Intent.ACTION_SEND);
                         emailIntent.setType("**");
 
@@ -218,9 +236,10 @@ public class MainActivity extends AppCompatActivity {
                         getContext().startActivity(Intent.createChooser(emailIntent, "Send mail..."));
 
                         Log.i("SensorloggerAlbert", "export finished!");*/
-                                            } catch (IOException ioe) {
-                                                Log.e("BlueToothAlbert", "IOException while writing Logfile");
-                                            }
+                                        } catch (IOException ioe) {
+                                            Log.e("BlueToothAlbert", "IOException while writing Logfile");
+                                        }
+                                    }
                                             // dataList.clear();
                                         }
                                     });

@@ -42,4 +42,13 @@
         android:layout_alignTop="@id/send"
         android:layout_toLeftOf="@id/send"
         android:text="Close" />
+
+    <Switch
+        android:id="@+id/record"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/open"
+        android:layout_marginTop="28dp"
+        android:text="Record"
+        android:layout_toEndOf="@+id/send" />
 </RelativeLayout>
