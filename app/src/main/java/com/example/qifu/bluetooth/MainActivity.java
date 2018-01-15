@@ -8,17 +8,19 @@ package com.example.qifu.bluetooth;
         import android.os.Environment;
         import android.os.Handler;
         import java.lang.reflect.Method;
+        import android.widget.Toast;
         import android.util.Log;
         import android.view.View;
         import android.content.Intent;
         import android.view.Menu;
-
+        import android.app.NotificationManager;
         import android.widget.TextView;
         import android.widget.EditText;
         import android.widget.Button;
         import android.widget.CompoundButton;
         import android.widget.Switch;
-
+        import android.app.Notification;
+        import android.support.v4.app.NotificationCompat;
         import java.io.BufferedWriter;
         import java.io.File;
         import java.io.FileWriter;
@@ -59,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         Switch recordswitch = (Switch) findViewById(R.id.record);
         myLabel = (TextView) findViewById(R.id.label);
         myTextbox = (EditText) findViewById(R.id.entry);
+        findBT();
 
         recordswitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener(){
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -80,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
                 startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(startMain);*/
             boolean success = false;
+            int iteration = 0;
             while (success == false)
             try {
                     findBT();
@@ -87,7 +91,16 @@ public class MainActivity extends AppCompatActivity {
                     success = true;
                 } catch (IOException ex) {
                 success = false;
+                iteration = iteration + 1;
+                if (iteration == 5)
+                { myLabel.setText("BlueTooth Device Found, Connection Failed");
+                    break;}
+                try {
+                    Thread.sleep(600);
+                } catch (InterruptedException e) {
                 }
+                }
+
             }
         });
 
@@ -96,10 +109,10 @@ public class MainActivity extends AppCompatActivity {
 
             public void onClick(View v) {
                 startService(new Intent(MainActivity.this,MyService.class));
-                try {
+               /* try {
                     sendData();
                 } catch (IOException ex) {
-                }
+                }*/
             }
         });
 
@@ -110,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
                 try {
                    closeBT();
                 } catch (IOException ex) {
+
                 }
             }
         });
@@ -140,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        String found = "Bluetooth Device Found: " + devicename;
+        String found = "Bluetooth Device Found on Record: " + devicename;
         myLabel.setText(found);
     }
 
@@ -154,8 +168,9 @@ public class MainActivity extends AppCompatActivity {
             mmOutputStream = mmSocket.getOutputStream();
             mmInputStream = mmSocket.getInputStream();
         } catch (IOException e) {
+            throw e;
             //try the fallback
-            try {
+            /*try {
                 bluetoothSocket = new FallbackBluetoothSocket(bluetoothSocket.getUnderlyingSocket());
                 Thread.sleep(500);
                 bluetoothSocket.connect();
@@ -173,7 +188,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.w("BT", e1.getMessage(), e1);
             } catch (IOException e1) {
                 Log.w("BT", "Fallback failed. Cancelling.", e1);
-            }
+            }*/
         }
 
 
@@ -283,9 +298,10 @@ public class MainActivity extends AppCompatActivity {
 
     void closeBT() throws IOException {
         stopWorker = true;
-        mmOutputStream.close();
+        if((mmOutputStream != null)&&(mmInputStream != null)&&(mmSocket != null))
+        {mmOutputStream.close();
         mmInputStream.close();
-        mmSocket.close();
+        mmSocket.close();}
         myLabel.setText("Bluetooth Closed");
     }
 
