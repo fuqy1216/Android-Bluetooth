@@ -10,6 +10,9 @@ package com.example.qifu.bluetooth;
         import java.lang.reflect.Method;
         import android.util.Log;
         import android.view.View;
+        import android.content.Intent;
+        import android.view.Menu;
+
         import android.widget.TextView;
         import android.widget.EditText;
         import android.widget.Button;
@@ -71,6 +74,11 @@ public class MainActivity extends AppCompatActivity {
         //Open Button
         openButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                //startService(new Intent(MainActivity.this,MyService.class));
+                //Intent startMain = new Intent(Intent.ACTION_MAIN);
+/*                startMain.addCategory(Intent.CATEGORY_HOME);
+                startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(startMain);*/
                 try {
                     findBT();
                     openBT();
@@ -81,7 +89,9 @@ public class MainActivity extends AppCompatActivity {
 
         //Send Button
         sendButton.setOnClickListener(new View.OnClickListener() {
+
             public void onClick(View v) {
+                startService(new Intent(MainActivity.this,MyService.class));
                 try {
                     sendData();
                 } catch (IOException ex) {
@@ -92,8 +102,9 @@ public class MainActivity extends AppCompatActivity {
         //Close button
         closeButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                stopService(new Intent(MainActivity.this,MyService.class));
                 try {
-                    closeBT();
+                   closeBT();
                 } catch (IOException ex) {
                 }
             }
