@@ -79,10 +79,14 @@ public class MainActivity extends AppCompatActivity {
 /*                startMain.addCategory(Intent.CATEGORY_HOME);
                 startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(startMain);*/
-                try {
+            boolean success = false;
+            while (success == false)
+            try {
                     findBT();
                     openBT();
+                    success = true;
                 } catch (IOException ex) {
+                success = false;
                 }
             }
         });
@@ -147,6 +151,8 @@ public class MainActivity extends AppCompatActivity {
         try {
             mmSocket = mmDevice.createRfcommSocketToServiceRecord(uuid);
             mmSocket.connect();
+            mmOutputStream = mmSocket.getOutputStream();
+            mmInputStream = mmSocket.getInputStream();
         } catch (IOException e) {
             //try the fallback
             try {
@@ -169,8 +175,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.w("BT", "Fallback failed. Cancelling.", e1);
             }
         }
-        mmOutputStream = mmSocket.getOutputStream();
-        mmInputStream = mmSocket.getInputStream();
+
 
         beginListenForData();
 
