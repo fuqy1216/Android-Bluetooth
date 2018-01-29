@@ -137,7 +137,7 @@ public class MainActivity extends AppCompatActivity {
         if (mBluetoothAdapter == null) {
             myLabel.setText("No bluetooth adapter available");
         }
-        if (!mBluetoothAdapter.isEnabled()) {
+        if (mBluetoothAdapter == null ||!mBluetoothAdapter.isEnabled()) {
             Intent enableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBluetooth, 0);
         }
@@ -224,7 +224,8 @@ public class MainActivity extends AppCompatActivity {
                                         public void run() {
                                             myLabel.setText(data);
                                     if(counter) {
-                                        final int total_row = data.length();
+                                        //final int total_row = data.length();
+                                        final int total_row = 2;
                                         Log.i("BlueToothAlbert", "total_row = " + total_row);
                                         final String fileprefix = "export";
                                         final String date = new SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(new Date());
